@@ -72,6 +72,17 @@ This guide is useful if you are using:
 * A local proxy address such as `127.0.0.1:7890`
 * Codex works differently when launched from Terminal and from Dock / Finder
 
+You may need this guide if:
+
+你可能需要这份指南，如果你遇到：
+
+- Terminal network works, but Codex.app launched from Dock / Finder cannot connect reliably.
+- ChatGPT mobile shows `Couldn't enable remote control. Try again.`
+- Your local proxy client is running, but Codex App still fails to enable Remote Control.
+- Opening Codex from Terminal behaves differently from opening it from the app icon.
+
+简单来说：终端正常，代理正常，但 Codex App 从图标启动后 Remote Control 仍然失败。
+
 In short:
 
 简单来说，本方案适用于：
