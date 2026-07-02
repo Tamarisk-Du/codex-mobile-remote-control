@@ -24,6 +24,12 @@ If Codex.app works differently when launched from Terminal and from Dock / Finde
 
 ## Common Error / 常见错误
 
+## Screenshots / 截图
+
+### Error on ChatGPT mobile / 手机端报错
+
+![Codex Remote Control error on ChatGPT mobile](images/codex-remote-control-error-chatgpt-mobile.png)
+
 When using Codex App Remote Control on macOS, ChatGPT mobile may show:
 
 ```text
