@@ -9,6 +9,12 @@ A bilingual macOS guide for fixing **ChatGPT mobile → Codex App Remote Control
 > This guide does not modify `Codex.app` itself.
 > 本方案不会修改 `Codex.app` 本体。
 
+## TL;DR / 一句话方案
+
+If Codex.app works differently when launched from Terminal and from Dock / Finder, this guide helps you set proxy environment variables for macOS GUI apps using LaunchAgent.
+
+如果终端里网络正常，但从 Dock / Finder 启动 Codex.app 后无法稳定连接，本方案通过 LaunchAgent 给 macOS 图形界面 App 设置代理环境变量。
+
 ---
 
 ## Common Error / 常见错误
