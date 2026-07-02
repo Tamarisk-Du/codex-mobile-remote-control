@@ -1,85 +1,156 @@
-# codex-mobile-remote-control
-A macOS setup guide for connecting ChatGPT mobile to OpenAI Codex App Remote Control in Mainland network environments using Clash proxy./# 连接 Codex 手机远程控制
-# 受限网络环境下连接 Codex 手机远程控制
+# Fix Codex Remote Control on macOS with Clash / Mihomo
 
-本文记录在 **受限网络环境** 下，通过 **Clash / Mihomo 类本机代理** 让手机 ChatGPT 成功连接 macOS 上的 **OpenAI Codex App Remote Control** 的配置方法。
+中文：解决 ChatGPT 手机端无法连接 macOS Codex App Remote Control 的问题。
 
-核心目标是：
+This guide fixes a common issue where ChatGPT mobile cannot enable or connect to Codex App Remote Control on macOS, especially when Codex.app is launched from Dock, Launchpad, or Finder and does not inherit local proxy environment variables.
 
-```text
-让原来的 Codex.app 图标也能继承本机代理环境，并且重启 Mac 后仍然生效。
-```
+适用场景：受限网络环境下，macOS 上的 Codex App 需要通过 Clash / Clash Verge / Mihomo 类本机代理启用 Remote Control。
 
----
+## Problem
 
-## 1. 问题背景
-
-在 macOS 上使用 OpenAI Codex App 的 Remote Control 功能时，手机 ChatGPT 可能无法成功连接电脑端 Codex。
-
-常见现象是提示：
-
-```text
-无法启用远程控制。请重试。
-```
-
-英文界面可能显示：
+When using Codex App Remote Control on macOS, ChatGPT mobile may show:
 
 ```text
 Couldn't enable remote control. Try again.
 ```
 
-经过排查，问题并不是手机扫码本身，而是：
+or:
 
 ```text
-从 Dock、Launchpad、Finder 直接启动的 Codex App 没有正确继承本机代理环境。
+无法启用远程控制。请重试。
 ```
 
-也就是说，本机代理本身是可用的，但 Codex App 直接从图形界面启动时，没有吃到代理环境变量，导致 Remote Control 无法正常启用或连接。
+The usual cause is that Codex.app launched from the macOS GUI does not inherit proxy environment variables such as `HTTPS_PROXY`, even though your local Clash / Mihomo proxy is working.
 
-解决思路是：
+换句话说，本机代理端口本身可用，但从 Dock、Launchpad、Finder 直接启动的 Codex App 没有吃到代理环境变量，导致 Remote Control 无法正常启用或连接。
+
+## Solution
+
+This repository shows how to use a macOS LaunchAgent to set GUI proxy environment variables automatically at login, so the original Codex.app icon can keep working after reboot.
+
+核心思路是：
 
 ```text
-通过 macOS LaunchAgent，在用户登录时自动写入 GUI 代理环境变量。
+通过 macOS LaunchAgent，在用户登录时自动执行 launchctl setenv。
 ```
 
 这样以后直接点击原来的 `Codex.app` 图标，也可以让 Codex 走本机代理。
 
----
+## What This Guide Covers
 
-## 2. 测试环境
+- macOS GUI proxy environment setup
+- Clash / Clash Verge / Mihomo local proxy port configuration
+- `launchctl setenv`
+- LaunchAgent auto-start
+- Codex App Remote Control troubleshooting
+- Safe rollback commands
+- Optional terminal-only startup method
 
-本文使用的环境如下：
-
-```text
-系统：macOS
-代理软件：Clash / Clash Verge / Mihomo 类客户端
-本机代理端口：127.0.0.1:7890
-Codex App 路径：/Applications/Codex.app
-```
-
-本文默认本机代理端口是：
+## Tested Environment
 
 ```text
-127.0.0.1:7890
+System: macOS
+Proxy client: Clash / Clash Verge / Mihomo
+Default local proxy: 127.0.0.1:7890
+Codex App path: /Applications/Codex.app
+Codex executable: /Applications/Codex.app/Contents/MacOS/Codex
 ```
 
-如果你的代理端口不是 `7890`，需要把本文所有命令里的 `7890` 替换成你的实际端口。
-
-例如你的端口是 `7897`，就把：
-
-```text
-127.0.0.1:7890
-```
-
-改成：
-
-```text
-127.0.0.1:7897
-```
+If your local proxy port is not `7890`, replace `127.0.0.1:7890` in the commands with your actual local proxy address, for example `127.0.0.1:7897`.
 
 ---
 
-## 3. 本方案做了什么
+## Quick Start
+
+1. Make sure your local proxy is running.
+2. Replace `7890` with your actual proxy port if needed.
+3. Run the setup commands below.
+4. Restart Codex.app.
+5. Enable Remote Control again in Codex App.
+
+```bash
+mkdir -p ~/bin ~/Library/LaunchAgents
+
+cat > ~/bin/set-gui-proxy-for-codex.sh <<'EOF'
+#!/bin/zsh
+
+launchctl setenv HTTP_PROXY http://127.0.0.1:7890
+launchctl setenv HTTPS_PROXY http://127.0.0.1:7890
+launchctl setenv ALL_PROXY http://127.0.0.1:7890
+
+launchctl setenv http_proxy http://127.0.0.1:7890
+launchctl setenv https_proxy http://127.0.0.1:7890
+launchctl setenv all_proxy http://127.0.0.1:7890
+
+launchctl setenv NO_PROXY "localhost,127.0.0.1,::1"
+launchctl setenv no_proxy "localhost,127.0.0.1,::1"
+EOF
+
+chmod +x ~/bin/set-gui-proxy-for-codex.sh
+
+cat > ~/Library/LaunchAgents/com.codex.gui-proxy.plist <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+ "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <key>Label</key>
+    <string>com.codex.gui-proxy</string>
+
+    <key>ProgramArguments</key>
+    <array>
+      <string>/bin/zsh</string>
+      <string>-lc</string>
+      <string>$HOME/bin/set-gui-proxy-for-codex.sh</string>
+    </array>
+
+    <key>RunAtLoad</key>
+    <true/>
+  </dict>
+</plist>
+EOF
+
+launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.codex.gui-proxy.plist 2>/dev/null
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.codex.gui-proxy.plist
+launchctl kickstart -k gui/$(id -u)/com.codex.gui-proxy
+
+osascript -e 'quit app "Codex"' 2>/dev/null
+open -a Codex
+```
+
+## Verify
+
+Check that the macOS GUI environment has the proxy variables:
+
+```bash
+launchctl getenv HTTPS_PROXY
+launchctl getenv NO_PROXY
+```
+
+Expected output:
+
+```text
+http://127.0.0.1:7890
+localhost,127.0.0.1,::1
+```
+
+You can also test the local proxy port directly:
+
+```bash
+curl -I --proxy http://127.0.0.1:7890 https://chatgpt.com
+```
+
+If the response includes:
+
+```text
+HTTP/1.1 200 Connection established
+```
+
+then the local proxy tunnel is working. A later `HTTP/2 403` from Cloudflare usually does not mean the proxy failed.
+
+---
+
+## 1. What This Setup Does
 
 本方案会创建一个 macOS LaunchAgent。
 
@@ -101,9 +172,7 @@ Finder
 
 配置完成后，可以继续直接点击原来的 `Codex.app` 图标启动 Codex，并让 Codex 走本机代理。
 
----
-
-## 4. 本方案不会修改什么
+## 2. What This Setup Does Not Change
 
 本方案不会修改以下内容：
 
@@ -122,9 +191,7 @@ SSH RemoteForward
 
 本方案也不会修改 Codex App 本体，因此不会破坏 App 签名，也不会影响 Codex 后续更新。
 
----
-
-## 5. 先检查本机代理是否可用
+## 3. Check Local Proxy Connectivity First
 
 在 macOS 本机终端运行：
 
@@ -159,9 +226,7 @@ Operation timed out
 
 此时需要先检查代理客户端是否正在运行，以及本机代理端口是否确实是 `7890`。
 
----
-
-## 6. 创建代理设置脚本
+## 4. Create the Proxy Setup Script
 
 在 macOS 本机终端运行：
 
@@ -205,9 +270,7 @@ localhost
 
 这些地址通常用于本机回调、本地服务或 OAuth 相关流程。让它们绕过代理可以减少本地连接异常。
 
----
-
-## 7. 创建 LaunchAgent
+## 5. Create the LaunchAgent
 
 继续在 macOS 本机终端运行：
 
@@ -239,9 +302,7 @@ EOF
 
 这个 LaunchAgent 会在当前用户登录 macOS 时自动运行。
 
----
-
-## 8. 立即加载 LaunchAgent
+## 6. Load the LaunchAgent Immediately
 
 不用重启，直接运行下面命令即可立即加载：
 
@@ -259,39 +320,7 @@ launchctl kickstart -k gui/$(id -u)/com.codex.gui-proxy
 
 第三行用于立即启动它。
 
----
-
-## 9. 检查是否生效
-
-检查 `HTTPS_PROXY`：
-
-```bash
-launchctl getenv HTTPS_PROXY
-```
-
-正常输出应该是：
-
-```text
-http://127.0.0.1:7890
-```
-
-检查 `NO_PROXY`：
-
-```bash
-launchctl getenv NO_PROXY
-```
-
-正常输出应该是：
-
-```text
-localhost,127.0.0.1,::1
-```
-
-如果这两项输出正确，说明 macOS 当前用户的图形界面代理环境已经设置成功。
-
----
-
-## 10. 重新启动 Codex App
+## 7. Restart Codex App
 
 先退出 Codex：
 
@@ -306,7 +335,7 @@ osascript -e 'quit app "Codex"'
 ```text
 Dock
 Launchpad
-Finder → Applications → Codex.app
+Finder -> Applications -> Codex.app
 ```
 
 也可以从终端打开：
@@ -320,14 +349,12 @@ open -a Codex
 ```text
 Dock
 Launchpad
-Finder → Applications → Codex.app
+Finder -> Applications -> Codex.app
 ```
 
 它们只是 macOS 图形界面的打开方式。
 
----
-
-## 11. 连接手机 ChatGPT
+## 8. Connect from ChatGPT Mobile
 
 打开 Codex App 后，进入 Remote Control 相关设置，启用远程控制。
 
@@ -342,9 +369,7 @@ Finder → Applications → Codex.app
 4. 本机代理客户端需要保持运行
 ```
 
----
-
-## 12. 以后怎么使用
+## 9. Daily Usage
 
 配置完成后，以后的使用顺序是：
 
@@ -366,9 +391,43 @@ Finder → Applications → Codex.app
 
 但此时该端口没有代理服务，可能导致 Codex 无法联网。
 
----
+## 10. Alternative: Launch Codex from Terminal Only
 
-## 13. 撤销配置
+如果你不想设置当前 macOS GUI 用户会话的代理变量，可以只在需要 Remote Control 时从终端启动 Codex。
+
+把下面函数加入 `~/.zshrc`：
+
+```bash
+codexclash() {
+  /usr/bin/osascript -e 'quit app "Codex"' >/dev/null 2>&1
+  sleep 2
+
+  nohup env \
+  HTTP_PROXY=http://127.0.0.1:7890 \
+  HTTPS_PROXY=http://127.0.0.1:7890 \
+  ALL_PROXY=http://127.0.0.1:7890 \
+  http_proxy=http://127.0.0.1:7890 \
+  https_proxy=http://127.0.0.1:7890 \
+  all_proxy=http://127.0.0.1:7890 \
+  NO_PROXY=localhost,127.0.0.1,::1 \
+  no_proxy=localhost,127.0.0.1,::1 \
+  /Applications/Codex.app/Contents/MacOS/Codex \
+  >/tmp/codex-clash.log 2>&1 &
+
+  disown
+  echo "Codex started with Clash / Mihomo proxy. Log: /tmp/codex-clash.log"
+}
+```
+
+之后运行：
+
+```bash
+codexclash
+```
+
+这个方案影响范围更小，但以后需要用终端命令启动 Codex，而不是直接点原来的图标。
+
+## 11. Rollback
 
 如果以后想撤销这个配置，可以运行：
 
@@ -392,11 +451,9 @@ launchctl unsetenv no_proxy
 
 撤销后，重新打开的 Codex App 将不再继承这些代理环境变量。
 
----
+## 12. FAQ
 
-## 14. 常见问题
-
-### 14.1 为什么 `curl` 返回 403 也算正常？
+### Why is `HTTP/2 403` acceptable in the proxy test?
 
 测试命令：
 
@@ -420,9 +477,7 @@ HTTP/2 403
 
 通常是 Cloudflare 对命令行请求的挑战或拦截，不代表代理端口不可用。
 
----
-
-### 14.2 为什么要设置 `NO_PROXY`？
+### Why set `NO_PROXY`?
 
 因为本机回环地址不应该走代理。
 
@@ -436,9 +491,7 @@ localhost
 
 Codex、本地服务、OAuth 回调或其他应用可能会使用本机地址。让这些地址绕过代理，可以避免本地连接被错误转发。
 
----
-
-### 14.3 为什么不直接修改 Codex.app？
+### Why not modify Codex.app directly?
 
 不建议直接修改：
 
@@ -457,9 +510,7 @@ Codex、本地服务、OAuth 回调或其他应用可能会使用本机地址。
 
 LaunchAgent 方案不修改 Codex App 本体，因此更安全。
 
----
-
-### 14.4 这个方案会影响远程 Ubuntu 或 VS Code Remote 吗？
+### Will this affect remote Ubuntu or VS Code Remote?
 
 不会。
 
@@ -476,26 +527,59 @@ SSH RemoteForward
 
 因此不会影响原有远程开发代理链路。
 
----
+## Screenshot Privacy Checklist
 
-## 15. 最终效果
+If you add screenshots, blur or crop:
 
-配置成功后，检查结果应该类似：
+- Account emails
+- Avatars
+- Workspace names
+- Device names
+- Real usernames in paths
+- Proxy node names
+- IP addresses
+
+## Recommended GitHub Repository Settings
+
+Suggested repository description:
 
 ```text
-launchctl getenv HTTPS_PROXY
-→ http://127.0.0.1:7890
-
-launchctl getenv NO_PROXY
-→ localhost,127.0.0.1,::1
+Fix ChatGPT mobile to Codex App Remote Control connection issues on macOS by setting GUI proxy environment variables with LaunchAgent for Clash/Mihomo.
 ```
 
-之后就可以直接点击原来的 Codex App 图标，让 Codex 继承本机代理环境，并在受限网络环境下使用手机 ChatGPT 连接 Codex Remote Control。
+Suggested GitHub Topics:
 
----
+```text
+codex
+openai
+openai-codex
+chatgpt
+chatgpt-mobile
+codex-app
+remote-control
+macos
+launchagent
+launchctl
+proxy
+clash
+mihomo
+clash-verge
+```
 
-## 16. 结论
+Suggested release title:
 
-本方案通过 macOS LaunchAgent 在用户登录时自动设置 GUI 代理环境变量，使 Codex App 在从 Dock、Launchpad 或 Finder 启动时也能使用本机代理。
+```text
+v1.0.0 - macOS LaunchAgent proxy setup for Codex Remote Control
+```
+
+Suggested release notes:
+
+```text
+Initial stable guide for fixing ChatGPT mobile to Codex App Remote Control connection issues on macOS using LaunchAgent and local proxy environment variables.
+```
+
+## Conclusion
+
+This setup uses macOS LaunchAgent to set GUI proxy environment variables at login, so Codex App can inherit local proxy settings even when launched from Dock, Launchpad, or Finder.
 
 这解决了受限网络环境下手机 ChatGPT 无法连接 macOS Codex App Remote Control 的问题，同时不会修改 Codex App 本体，也不会影响 SSH、Ubuntu、VS Code Remote 等原有远程开发配置。
