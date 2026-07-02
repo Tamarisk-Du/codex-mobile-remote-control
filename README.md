@@ -1,5 +1,10 @@
 # Fix ChatGPT Mobile → Codex App Remote Control on macOS
 
+![Platform](https://img.shields.io/badge/platform-macOS-lightgrey)
+![Type](https://img.shields.io/badge/type-troubleshooting%20guide-blue)
+![Topic](https://img.shields.io/badge/topic-Codex%20Remote%20Control-purple)
+![License](https://img.shields.io/badge/license-MIT-green)
+
 中文：解决 macOS 上手机 ChatGPT 无法连接 Codex App Remote Control 的问题。
 
 A bilingual macOS guide for fixing **ChatGPT mobile → Codex App Remote Control** connection issues when `Codex.app` needs a local proxy environment but does not inherit proxy variables from GUI launchers.
